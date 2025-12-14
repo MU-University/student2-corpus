@@ -28,7 +28,7 @@ jobs:
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.CORPUS_TOKEN }}
-          repository: your-org/assignment-corpus
+          repository: mu-university/assignment-corpus
           event-type: submit-assignment
           client-payload: |
             {
