@@ -28,7 +28,7 @@ jobs:
         (github.event_name == 'workflow_dispatch') ||
         (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)
       )
-    uses: mu-university/assignment-corpus/.github/workflows/submit.yml@v1
+    uses: mu-university/assignment-corpus/.github/workflows/submit.yml@main
     secrets: inherit
     with:
       assignment: ${{ github.event.repository.name }}
