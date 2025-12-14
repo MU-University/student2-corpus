@@ -1,84 +1,37 @@
 # yaml
-name: CI + Dispatch + JPlag
+# File: '.github/workflows/ci.yml' in the student repo
+name: CI
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
 
 jobs:
-  build-dispatch-jplag:
+  build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout student repo
-        uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
           cache: maven
+      - run: mvn -B -q clean test
 
-      - name: Build and test
-        run: mvn -B -q clean test
-
-      - name: Notify corpus repo to stage src
-        if: >
-          (github.event_name == 'push' && github.ref_name == 'main' && success()) ||
-          (github.event_name == 'workflow_dispatch' && success()) ||
-          (github.event_name == 'pull_request' && success())
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.CORPUS_TOKEN }}
-          repository: mu-university/assignment-corpus
-          event-type: submit-assignment
-          client-payload: |
-            {
-              "assignment": "${{ github.event.repository.name }}",
-              "owner": "${{ github.repository_owner }}",
-              "repo": "${{ github.repository }}"
-            }
-
-      - name: Wait briefly for corpus sync
-        if: >
-          (github.event_name == 'push' && github.ref_name == 'main' && success()) ||
-          (github.event_name == 'workflow_dispatch' && success()) ||
-          (github.event_name == 'pull_request' && success())
-        run: sleep 10
-
-      - name: Download JPlag
-        if: >
-          (github.event_name == 'push' && github.ref_name == 'main' && success()) ||
-          (github.event_name == 'workflow_dispatch' && success()) ||
-          (github.event_name == 'pull_request' && success())
-        run: |
-          mkdir -p lib results
-          curl -L -o lib/jplag.jar https://github.com/jplag/JPlag/releases/download/v4.2.0/jplag-4.2.0-jar-with-dependencies.jar
-
-      - name: Clone corpus and run JPlag for this assignment
-        if: >
-          (github.event_name == 'push' && github.ref_name == 'main' && success()) ||
-          (github.event_name == 'workflow_dispatch' && success()) ||
-          (github.event_name == 'pull_request' && success())
-        run: |
-          ASSIGN="${{ github.event.repository.name }}"
-          git clone --depth=1 "https://github.com/mu-university/assignment-corpus.git" corpus
-          java -jar ./lib/jplag.jar \
-            "corpus/submission/$ASSIGN" \
-            -l java \
-            --subdirectory "src/main/java" \
-            -x "**/src/test/**" \
-            -r "results/$ASSIGN"
-
-      - name: Upload JPlag results
-        if: >
-          (github.event_name == 'push' && github.ref_name == 'main' && success()) ||
-          (github.event_name == 'workflow_dispatch' && success()) ||
-          (github.event_name == 'pull_request' && success())
-        uses: actions/upload-artifact@v4
-        with:
-          name: jplag-results-${{ github.event.repository.name }}
-          path: results
+  submit-assignment:
+    if: >
+      success() &&
+      (
+        (github.event_name == 'push' && github.ref_name == 'master') ||
+        (github.event_name == 'workflow_dispatch') ||
+        (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)
+      )
+    uses: mu-university/assignment-corpus/.github/workflows/submit.yml@v1
+    secrets: inherit
+    with:
+      assignment: ${{ github.event.repository.name }}
+      owner: ${{ github.repository_owner }}
+      repo: ${{ github.repository }}
+      ref: ${{ github.ref_name }}
