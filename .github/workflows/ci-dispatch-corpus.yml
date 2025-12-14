@@ -1,0 +1,67 @@
+name: CI + Dispatch + JPlag
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build-dispatch-jplag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout student repo
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+
+      - name: Build and test
+        run: mvn -B -q clean test
+
+      - name: Notify corpus repo to stage src
+        if: github.ref == 'refs/heads/main' && success()
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.CORPUS_TOKEN }}
+          repository: your-org/assignment-corpus
+          event-type: submit-assignment
+          client-payload: |
+            {
+              "assignment": "${{ github.event.repository.name }}",
+              "owner": "${{ github.repository_owner }}",
+              "repo": "${{ github.repository }}"
+            }
+
+      - name: Wait briefly for corpus sync
+        if: github.ref == 'refs/heads/main' && success()
+        run: sleep 10
+
+      - name: Download JPlag
+        if: github.ref == 'refs/heads/main' && success()
+        run: |
+          mkdir -p lib results
+          curl -L -o lib/jplag.jar https://github.com/jplag/JPlag/releases/download/v4.2.0/jplag-4.2.0-jar-with-dependencies.jar
+
+      - name: Clone corpus and run JPlag for this assignment
+        if: github.ref == 'refs/heads/main' && success()
+        run: |
+          ASSIGN="${{ github.event.repository.name }}"
+          git clone --depth=1 "https://github.com/your-org/assignment-corpus.git" corpus
+          java -jar ./lib/jplag.jar \
+            "corpus/submission/$ASSIGN" \
+            -l java \
+            --subdirectory "src/main/java" \
+            -x "**/src/test/**" \
+            -r "results/$ASSIGN"
+
+      - name: Upload JPlag results
+        if: github.ref == 'refs/heads/main' && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jplag-results-${{ github.event.repository.name }}
+          path: results
