@@ -51,7 +51,7 @@ jobs:
         if: github.ref == 'refs/heads/main' && success()
         run: |
           ASSIGN="${{ github.event.repository.name }}"
-          git clone --depth=1 "https://github.com/your-org/assignment-corpus.git" corpus
+          git clone --depth=1 "https://github.com/mu-university/assignment-corpus.git" corpus
           java -jar ./lib/jplag.jar \
             "corpus/submission/$ASSIGN" \
             -l java \
