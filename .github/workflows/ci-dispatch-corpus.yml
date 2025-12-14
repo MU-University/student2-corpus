@@ -1,3 +1,4 @@
+# yaml
 name: CI + Dispatch + JPlag
 
 on:
@@ -25,7 +26,10 @@ jobs:
         run: mvn -B -q clean test
 
       - name: Notify corpus repo to stage src
-        if: github.ref == 'refs/heads/main' && success()
+        if: >
+          (github.event_name == 'push' && github.ref_name == 'main' && success()) ||
+          (github.event_name == 'workflow_dispatch' && success()) ||
+          (github.event_name == 'pull_request' && success())
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.CORPUS_TOKEN }}
@@ -39,17 +43,26 @@ jobs:
             }
 
       - name: Wait briefly for corpus sync
-        if: github.ref == 'refs/heads/main' && success()
+        if: >
+          (github.event_name == 'push' && github.ref_name == 'main' && success()) ||
+          (github.event_name == 'workflow_dispatch' && success()) ||
+          (github.event_name == 'pull_request' && success())
         run: sleep 10
 
       - name: Download JPlag
-        if: github.ref == 'refs/heads/main' && success()
+        if: >
+          (github.event_name == 'push' && github.ref_name == 'main' && success()) ||
+          (github.event_name == 'workflow_dispatch' && success()) ||
+          (github.event_name == 'pull_request' && success())
         run: |
           mkdir -p lib results
           curl -L -o lib/jplag.jar https://github.com/jplag/JPlag/releases/download/v4.2.0/jplag-4.2.0-jar-with-dependencies.jar
 
       - name: Clone corpus and run JPlag for this assignment
-        if: github.ref == 'refs/heads/main' && success()
+        if: >
+          (github.event_name == 'push' && github.ref_name == 'main' && success()) ||
+          (github.event_name == 'workflow_dispatch' && success()) ||
+          (github.event_name == 'pull_request' && success())
         run: |
           ASSIGN="${{ github.event.repository.name }}"
           git clone --depth=1 "https://github.com/mu-university/assignment-corpus.git" corpus
@@ -61,7 +74,10 @@ jobs:
             -r "results/$ASSIGN"
 
       - name: Upload JPlag results
-        if: github.ref == 'refs/heads/main' && success()
+        if: >
+          (github.event_name == 'push' && github.ref_name == 'main' && success()) ||
+          (github.event_name == 'workflow_dispatch' && success()) ||
+          (github.event_name == 'pull_request' && success())
         uses: actions/upload-artifact@v4
         with:
           name: jplag-results-${{ github.event.repository.name }}
